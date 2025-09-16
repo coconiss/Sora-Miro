@@ -135,11 +135,9 @@ export const useTourismData = () => {
           response = await searchFestival(language, festParams);
         } else if (filters.query.trim()) {
           // 기존 로직: 키워드 검색
-          console.log('Calling searchKeyword with params:', { language, query: filters.query, params });
           response = await searchKeyword(language, filters.query, params);
         } else {
           // 기존 로직: 지역기반 목록 조회
-          console.log('Calling getAreaBasedList with params:', { language, params });
           response = await getAreaBasedList(language, params);
         }
 

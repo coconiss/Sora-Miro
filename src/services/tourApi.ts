@@ -1,42 +1,81 @@
 const BASE_URL = 'https://apis.data.go.kr/B551011';
 
 // API 서비스 객체 - 언어별 endpoint와 서비스키를 관리
-const API_SERVICES = {
-ko: {
-    name: 'KorService2',
-endpoint: `${BASE_URL}/KorService2`,
-serviceKey: 'YourApiKey' // 실제 서비스키로 교체 필요
-},
-en: {
-name: 'EngService2',
-endpoint: `${BASE_URL}/EngService2`,
-serviceKey: 'YourApiKey' // 실제 서비스키로 교체 필요
-},
-ja: {
-name: 'JpnService2',
-endpoint: `${BASE_URL}/JpnService2`,
-serviceKey: 'YourApiKey' // 실제 서비스키로 교체 필요
-},
-zh: {
-name: 'ChsService2',
-endpoint: `${BASE_URL}/ChsService2`,
-serviceKey: 'YourApiKey' // 실제 서비스키로 교체 필요
-},
-de: {
-name: 'GerService2',
-endpoint: `${BASE_URL}/GerService2`,
-serviceKey: 'YourApiKey' // 실제 서비스키로 교체 필요
-},
-fr: {
-name: 'FreService2',
-endpoint: `${BASE_URL}/FreService2`,
-serviceKey: 'YourApiKey' // 실제 서비스키로 교체 필요
+// Get API key from environment variables
+const API_KEY = (import.meta.env.VITE_TOUR_API_KEY || process.env.VITE_TOUR_API_KEY) as string;
+
+if (!API_KEY) {
+  // This will be shown in the browser's console in development
+  if (import.meta.env.DEV) {
+    console.error('API key is not set. Please set VITE_TOUR_API_KEY in your .env file');
+  }
 }
+
+// API 서비스 객체 - 언어별 endpoint와 서비스키를 관리
+const API_SERVICES = {
+  ko: {
+    name: 'KorService2',
+    endpoint: `${BASE_URL}/KorService2`,
+    serviceKey: API_KEY
+  },
+  en: {
+    name: 'EngService2',
+    endpoint: `${BASE_URL}/EngService2`,
+    serviceKey: API_KEY
+  },
+  ja: {
+    name: 'JpnService2',
+    endpoint: `${BASE_URL}/JpnService2`,
+    serviceKey: API_KEY
+  },
+  zh: {
+    name: 'ChsService2',
+    endpoint: `${BASE_URL}/ChsService2`,
+    serviceKey: API_KEY
+  },
+  de: {
+    name: 'GerService2',
+    endpoint: `${BASE_URL}/GerService2`,
+    serviceKey: API_KEY
+  },
+  fr: {
+    name: 'FreService2',
+    endpoint: `${BASE_URL}/FreService2`,
+    serviceKey: API_KEY
+  }
 } as const;
 
 export type Language = keyof typeof API_SERVICES;
 
 export interface TourApiParams {
+  serviceKey?: string;
+  numOfRows?: number;
+  pageNo?: number;
+  MobileOS?: 'ETC' | 'IOS' | 'AND' | 'WIN';
+  MobileApp?: string;
+  _type?: 'json' | 'xml';
+  listYN?: 'Y' | 'N';
+  arrange?: 'A' | 'B' | 'C' | 'D' | 'E';
+  contentTypeId?: string;
+  areaCode?: string;
+  sigunguCode?: string;
+  cat1?: string;
+  cat2?: string;
+  cat3?: string;
+  keyword?: string;
+  contentId?: string;
+  mapX?: string;
+  mapY?: string;
+  radius?: number;
+  defaultYN?: 'Y' | 'N';
+  firstImageYN?: 'Y' | 'N';
+  areacodeYN?: 'Y' | 'N';
+  catcodeYN?: 'Y' | 'N';
+  addrinfoYN?: 'Y' | 'N';
+  mapinfoYN?: 'Y' | 'N';
+  overviewYN?: 'Y' | 'N';
+  imageYN?: 'Y' | 'N';
+  subImageYN?: 'Y' | 'N';
 serviceKey?: string;
 numOfRows?: number;
 pageNo?: number;
