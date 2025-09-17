@@ -68,17 +68,17 @@ const translations: Translations = {
 };
 
 export const t = (key: string, language: string = 'ko'): string => {
-  // Direct access for simple cases
+  // 간단한 경우 직접 접근
   if (translations[language] && translations[language][key]) {
     return translations[language][key];
   }
   
-  // Fallback to Korean if translation not found
+  // 번역을 찾을 수 없는 경우 한국어로 폴백
   if (language !== 'ko' && translations.ko[key]) {
     return translations.ko[key];
   }
   
-  // If key is not found, return the key itself
+  // 키를 찾을 수 없는 경우 키 자체 반환
   return key;
 };
 

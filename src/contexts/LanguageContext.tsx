@@ -11,6 +11,11 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+/**
+ * LANGUAGES
+ * - 지원하는 언어 목록과 레이블/아이콘을 정의합니다.
+ * - UI에서 언어 선택기 등에 사용됩니다.
+ */
 export const LANGUAGES = {
   ko: { label: '한국어', flag: '🇰🇷' },
   en: { label: 'English', flag: '🇺🇸' },
@@ -25,22 +30,30 @@ interface LanguageProviderProps {
 }
 
 export const LanguageProvider = ({ children }: LanguageProviderProps) => {
+  // 현재 선택된 언어 상태
   const [language, setLanguage] = useState<Language>('ko');
 
+  /**
+   * getLanguageLabel
+   * - 주어진 언어 코드에 대응하는 UI용 레이블을 반환합니다.
+   */
   const getLanguageLabel = (lang: Language): string => {
     return LANGUAGES[lang]?.label || lang;
   };
 
+  /**
+   * translate
+   * - 단순 키-값 기반 번역 함수입니다.
+   * - 프로젝트가 커지면 i18n 라이브러리 도입을 권장합니다.
+   */
   const translate = useCallback((key: string): string => {
-    // Direct access to translations
     if (translations[language] && translations[language][key]) {
       return translations[language][key];
     }
-    // Fallback to Korean
+    // 한글(ko)로 폴백
     if (language !== 'ko' && translations.ko[key]) {
       return translations.ko[key];
     }
-    // If translation not found, return the key
     return key;
   }, [language]);
 

@@ -12,10 +12,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     base: "/", // 루트 도메인에 올릴 때
-    define: {
-      // Make environment variables available in the client-side code
-      'import.meta.env.VITE_TOUR_API_KEY': JSON.stringify(env.VITE_TOUR_API_KEY)
-    },
+    // Note: avoid embedding sensitive API keys into the client bundle here.
+    // Keep secrets on the server/worker and expose only the proxy URL to the client.
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
