@@ -5,7 +5,7 @@ const NotFound = () => {
   const location = useLocation();
 
   useEffect(() => {
-    // Log 404 error for non-existent routes
+    // 존재하지 않는 경로에 대한 404 에러 로깅
   }, [location.pathname]);
 
   return (

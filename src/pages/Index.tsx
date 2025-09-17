@@ -14,6 +14,7 @@ import heroTemple from "@/assets/hero-temple.jpg";
 const Index = () => {
   const [selectedItem, setSelectedItem] = useState<TourismItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
   const { items, loading, searchTourism, getItemDetail, totalCount, currentPage } = useTourismData();
   const [currentFilters, setCurrentFilters] = useState<SearchFilters>({
     query: '',
@@ -24,16 +25,23 @@ const Index = () => {
   const handleShowDetails = async (id: string) => {
     const item = items.find(item => item.id === id || item.contentid === id);
     if (item) {
-      // API에서 상세 정보를 가져옵니다
-      const detailItem = await getItemDetail(item.contentid || item.id, item.contenttypeid);
-      setSelectedItem(detailItem || item);
+      // 모달을 먼저 열고 상세 정보를 비동기로 불러옵니다.
+      // modalLoading 플래그로 로딩 상태를 제어합니다.
+      setSelectedItem(item);
       setIsModalOpen(true);
+      setModalLoading(true);
+      try {
+        const detailItem = await getItemDetail(item.contentid || item.id, item.contenttypeid);
+        setSelectedItem(detailItem || item);
+      } finally {
+        setModalLoading(false);
+      }
     }
   };
 
   const handleSearch = (filters: SearchFilters) => {
     setCurrentFilters(filters);
-    searchTourism(filters, 1); // Reset to first page on new search
+    searchTourism(filters, 1); // 새 검색 시 첫 페이지로 리셋
   };
 
   const handlePageChange = (page: number) => {
@@ -56,7 +64,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
+      {/* 히어로 섹션 */}
       <section className="relative h-[70vh] overflow-hidden">
         <div 
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -65,7 +73,7 @@ const Index = () => {
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
         </div>
         
-        {/* Language Selector */}
+        {/* 언어 선택기 */}
         <div className="absolute top-6 right-6 z-20">
           <LanguageSelector />
         </div>
@@ -80,7 +88,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Stats Section */}
+  {/* 통계 섹션 */}
       <section className="py-16 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
@@ -97,7 +105,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Search Section */}
+  {/* 검색 섹션 */}
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -113,7 +121,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Results Section */}
+  {/* 결과 섹션 */}
       <section className="pb-16">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between mb-8">
@@ -165,11 +173,12 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Modal */}
+      {/* 상세 모달 */}
       <TourismDetailModal
         item={selectedItem}
         open={isModalOpen}
         onClose={handleCloseModal}
+        loading={modalLoading}
       />
     </div>
   );

@@ -1,23 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-//gpt
+// GPT를 통해 생성된 코드
 import { getAreaBasedList, getDetailCommon, getDetailInfo, getDetailIntro, searchKeyword, searchFestival, AREA_CODES, CONTENT_TYPE_CODES, type TourApiParams } from '@/services/tourApi';
 import { TourismItem } from '@/types/tourism';
 import { useToast } from '@/hooks/use-toast';
 
-//export interface SearchFilters {
+// 검색 필터 인터페이스 (주석 처리됨) {
 //  query: string;
 //  category: string;
 //  region: string;
 //}
-//gpt
+// GPT를 통해 생성된 코드
 export interface SearchFilters {
   query: string;
   category: string;
   region: string;
-  startDate?: string; // YYYY-MM-DD
-  endDate?: string;   // YYYY-MM-DD
+  startDate?: string; // 시작일 (YYYY-MM-DD 형식)
+  endDate?: string;   // 종료일 (YYYY-MM-DD 형식)
 }
 
 export const useTourismData = () => {
@@ -30,10 +30,14 @@ export const useTourismData = () => {
   const { language } = useLanguage();
   const { toast } = useToast();
 
-  // API 응답 데이터를 TourismItem 형식으로 변환
-  const transformApiData = (apiData: any[]): TourismItem[] => {
-    return apiData.map((item: any) => ({
-      id: item.contentid || item.contentId || Math.random().toString(),
+  /**
+   * transformApiData
+   * - API에서 반환된 원시 객체 배열을 내부에서 사용하는 TourismItem 타입으로 변환합니다.
+   * - 외부 API 필드명이 변동될 수 있으므로 안전하게 접근합니다.
+   */
+  const transformApiData = (apiData: Array<Record<string, any>>): TourismItem[] => {
+    return apiData.map((item: Record<string, any>) => ({
+      id: item.contentid || item.contentId || (typeof crypto !== 'undefined' && (crypto as any).randomUUID ? (crypto as any).randomUUID() : Math.random().toString()),
       contentid: item.contentid,
       contenttypeid: item.contenttypeid,
       title: item.title,
@@ -78,7 +82,12 @@ export const useTourismData = () => {
     }));
   };
 
-  // 관광 정보 검색
+  /**
+   * searchTourism
+   * - 주어진 필터와 페이지로 관광정보를 조회합니다.
+   * - 카테고리, 지역, 키워드에 따라 적절한 API 엔드포인트를 선택합니다.
+   * - 결과는 items에 덮어쓰기 방식으로 저장되며 페이징 정보를 함께 업데이트합니다.
+   */
   const searchTourism = async (filters: SearchFilters, page: number = 1) => {
     setLoading(true);
     setError(null);
@@ -87,8 +96,8 @@ export const useTourismData = () => {
       const params: TourApiParams = {
         pageNo: page,
         numOfRows: 12,
-        _type: 'json', // Ensure JSON response
-        arrange: 'C', // Sort by modified date (most recent first)
+        _type: 'json', 
+        arrange: 'C', 
       };
       
       // Reset to first page if filters change
@@ -110,13 +119,12 @@ export const useTourismData = () => {
       
       try {
         // 키워드가 있으면 키워드 검색, 없으면 지역기반 목록 조회
-//        if (filters.query.trim()) {
-//          response = await searchKeyword(language, filters.query, params);
-//        } else {
-//          response = await getAreaBasedList(language, params);
-//        }
+        //if (filters.query.trim()) {
+        //  response = await searchKeyword(language, filters.query, params);
+        //  } else {
+        //  response = await getAreaBasedList(language, params);
+        //}
 
-        // gpt
         // 축제/공연 분기: searchFestival2 (행사정보 조회)
         if (filters.category === 'C01') {
           const toYmd = (d?: string) => d ? d.replace(/-/g, '') : undefined;
@@ -126,7 +134,7 @@ export const useTourismData = () => {
             pageNo: params.pageNo,
             MobileOS: 'ETC',
             MobileApp: 'TourismApp',
-            AreaCode: params.areaCode,
+            areaCode: params.areaCode,
             _type: 'json',
             eventStartDate: toYmd(filters.startDate),
             ...(filters.endDate ? { eventEndDate: toYmd(filters.endDate) } : {}),
@@ -173,9 +181,6 @@ export const useTourismData = () => {
             );
           }
         }
-
-        // If we get here, the response format is unexpected
-        
         throw new Error('Unexpected response format from API');
       } catch (apiError) {
         
@@ -209,7 +214,12 @@ export const useTourismData = () => {
     }
   };
 
-  // 상세 정보 조회
+  /**
+   * getItemDetail
+   * - 콘텐츠 ID와 타입ID로 상세 정보를 조합하여 반환합니다.
+   * - 공통 정보(detailCommon), 소개(detailIntro), 반복정보(detailInfo)를 순차적으로 조회해 하나의 객체로 병합합니다.
+   * - 실패 시 null을 반환하고 사용자에게 토스트로 알립니다.
+   */
   const getItemDetail = async (contentId: string, contentTypeId?: string): Promise<TourismItem | null> => {
     try {
       if (!contentTypeId) {
@@ -273,7 +283,10 @@ export const useTourismData = () => {
     }
   };
 
-  // 초기 데이터 로드
+  /**
+   * 초기 로드
+   * - 컴포넌트 마운트 또는 언어 변경 시 기본 검색을 수행합니다.
+   */
   useEffect(() => {
     searchTourism({ query: '', category: 'all', region: 'all' });
   }, [language]);

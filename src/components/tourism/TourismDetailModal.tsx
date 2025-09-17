@@ -6,24 +6,24 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-// Utility function to safely render HTML content with proper formatting
+// HTML 콘텐츠를 안전하게 렌더링하기 위한 유틸리티 함수
 const renderHtmlContent = (htmlString: string) => {
   if (!htmlString) return null;
   
-  // First, handle special cases like <br> and lists
+  // 먼저 <br>과 같은 특수 케이스와 목록을 처리합니다
   let processedHtml = htmlString
-    .replace(/<br\s*\/?>/gi, '\n') // Convert <br> to newlines
-    .replace(/<\/p>|<\/div>|<\/li>/gi, '\n') // Add newlines after block elements
-    .replace(/<li>/gi, '• ') // Convert list items to bullet points
-    .replace(/<[^>]+>/g, '') // Remove all other HTML tags
-    .replace(/&nbsp;/g, ' ') // Convert non-breaking spaces to regular spaces
-    .replace(/&amp;/g, '&') // Convert HTML entities
+    .replace(/<br\s*\/?>/gi, '\n') // <br> 태그를 개행문자로 변환
+    .replace(/<\/p>|<\/div>|<\/li>/gi, '\n') // 블록 요소 뒤에 개행 문자 추가
+    .replace(/<li>/gi, '• ') // 목록 항목을 불릿 포인트로 변환
+    .replace(/<[^>]+>/g, '') // 기타 모든 HTML 태그 제거
+    .replace(/&nbsp;/g, ' ') // 줄바꿈 없는 공백을 일반 공백으로 변환
+    .replace(/&amp;/g, '&') // HTML 엔티티 변환
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
     
-  // Clean up multiple consecutive newlines
+  // 연속된 개행 문자 정리
   processedHtml = processedHtml
     .split('\n')
     .map(line => line.trim())
@@ -58,7 +58,9 @@ interface TourismDetailModalProps {
   item: TourismItem | null;
   open: boolean;
   onClose: () => void;
+  loading?: boolean;
 }
+
 
 const getCategoryName = (catCode?: string): string => {
   if (!catCode) return '기타';
@@ -85,8 +87,8 @@ const getContentTypeName = (contentTypeId?: string): string => {
   return contentTypes[contentTypeId.toString()] || '';
 };
 
-export const TourismDetailModal = ({ item, open, onClose }: TourismDetailModalProps) => {
-  if (!item) return null;
+export const TourismDetailModal = ({ item, open, onClose, loading = false }: TourismDetailModalProps) => {
+  if (!item && !loading) return null;
 
   const formatAddress = (item: TourismItem): string => {
     if (item.addr1) {
@@ -116,8 +118,8 @@ export const TourismDetailModal = ({ item, open, onClose }: TourismDetailModalPr
     return `${formatDate(start)} ~ ${formatDate(end)}`;
   };
   
-  const festivalDateRange = item.eventstartdate && item.eventenddate 
-    ? formatDateRange(item.eventstartdate, item.eventenddate)
+  const festivalDateRange = (item && (item as any).eventstartdate && (item as any).eventenddate)
+    ? formatDateRange((item as any).eventstartdate, (item as any).eventenddate)
     : '';
 
   const address = formatAddress(item);
@@ -144,26 +146,26 @@ export const TourismDetailModal = ({ item, open, onClose }: TourismDetailModalPr
   );
 
   const InfoItem = ({ icon: Icon, label, value, link }: { icon: any, label: string, value: string, link?: string }) => {
-    // Extract title from HTML if it's a full anchor tag
+    // 앵커 태그에서 제목 추출
     const getLinkTitle = (html: string) => {
-      // First try to get the title attribute
+      // 1. title 속성에서 제목 추출 시도
       const titleMatch = html.match(/title="([^"]*)"/);
       if (titleMatch && titleMatch[1]) {
         return titleMatch[1];
       }
       
-      // If no title, try to get the link text between > and <
+      // 2. title이 없으면 >와 < 사이의 링크 텍스트 추출 시도
       const textMatch = html.match(/>([^<]*)</);
       if (textMatch && textMatch[1]) {
         return textMatch[1].trim();
       }
       
-      // Fallback to the URL if no text content found
+      // 3. 텍스트가 없으면 URL을 대체값으로 사용
       const urlMatch = html.match(/href="([^"]*)"/);
       return urlMatch ? urlMatch[1].replace(/^https?:\/\//, '') : html;
     };
 
-    // Extract URL from HTML if it's a full anchor tag
+    // 앵커 태그에서 URL 추출
     const getLinkHref = (html: string) => {
       const match = html.match(/href="([^"]*)"/);
       return match ? match[1] : html;
@@ -202,7 +204,7 @@ export const TourismDetailModal = ({ item, open, onClose }: TourismDetailModalPr
     <Dialog open={open} onOpenChange={() => onClose()}>
       <DialogContent className="p-0 gap-0">
         <DialogHeader className="p-6 pb-4">
-          <DialogTitle className="text-xl font-bold text-left pr-8">{item.title}</DialogTitle>
+          <DialogTitle className="text-xl font-bold text-left pr-8">{loading ? '로딩 중...' : item?.title}</DialogTitle>
           <div className="flex flex-col gap-3 mt-3">
             <div className="flex gap-2">
               <Badge variant="secondary">{category}</Badge>
@@ -222,7 +224,11 @@ export const TourismDetailModal = ({ item, open, onClose }: TourismDetailModalPr
             {/* Hero Image */}
             <div className="relative -mx-6 overflow-hidden bg-muted/20">
               <div className="w-full aspect-video max-h-[500px] flex items-center justify-center">
-                {item.firstimage || item.image ? (
+                {loading ? (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="animate-pulse w-11/12 h-48 bg-muted rounded" />
+                  </div>
+                ) : item.firstimage || item.image ? (
                   <img
                     src={item.firstimage || item.image}
                     alt={item.title}
@@ -241,31 +247,41 @@ export const TourismDetailModal = ({ item, open, onClose }: TourismDetailModalPr
 
             {/* Basic Information */}
             <InfoSection icon={Info} title="기본 정보">
-              <InfoItem 
-                icon={MapPin} 
-                label="주소" 
-                value={address}
-                link={mapUrl !== '#' ? mapUrl : undefined}
-              />
-              
-              {item.tel && (
-                <InfoItem icon={Phone} label="전화번호" value={item.tel} />
-              )}
-              
-              {item.infocenter && item.infocenter !== item.tel && (
-                <InfoItem icon={Phone} label="문의처" value={item.infocenter} />
-              )}
-              
-              {item.bookingplace && (
-                <InfoItem icon={Phone} label="예약처" value={item.bookingplace} />
-              )}
-              
-              {homepage && (
-                <InfoItem 
-                  icon={Globe} 
-                  label="홈페이지" 
-                  value={homepage}
-                />
+              {loading ? (
+                <div className="space-y-3">
+                  <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+                  <div className="h-3 w-full bg-muted animate-pulse rounded" />
+                  <div className="h-3 w-1/2 bg-muted animate-pulse rounded" />
+                </div>
+              ) : (
+                <>
+                  <InfoItem 
+                    icon={MapPin} 
+                    label="주소" 
+                    value={address}
+                    link={mapUrl !== '#' ? mapUrl : undefined}
+                  />
+                  
+                  {item.tel && (
+                    <InfoItem icon={Phone} label="전화번호" value={item.tel} />
+                  )}
+                  
+                  {item.infocenter && item.infocenter !== item.tel && (
+                    <InfoItem icon={Phone} label="문의처" value={item.infocenter} />
+                  )}
+                  
+                  {item.bookingplace && (
+                    <InfoItem icon={Phone} label="예약처" value={item.bookingplace} />
+                  )}
+                  
+                  {homepage && (
+                    <InfoItem 
+                      icon={Globe} 
+                      label="홈페이지" 
+                      value={homepage}
+                    />
+                  )}
+                </>
               )}
             </InfoSection>
 

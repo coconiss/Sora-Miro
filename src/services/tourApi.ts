@@ -1,57 +1,35 @@
+// tourApi 모듈
+// - 공공 관광 API(한국관광공사) 호출을 위한 헬퍼들을 제공합니다.
+// - 클라이언트는 로컬/프록시(worker) URL을 통해 요청을 보냅니다. 민감한 키는 서버/워커에서 관리해야 합니다.
 const BASE_URL = 'https://apis.data.go.kr/B551011';
 
-// API 서비스 객체 - 언어별 endpoint와 서비스키를 관리
-// Get API key from environment variables
-const API_KEY = (import.meta.env.VITE_TOUR_API_KEY || process.env.VITE_TOUR_API_KEY) as string;
+// 클라이언트에서 호출하는 프록시(예: Cloudflare Worker) 기본 URL
+// 환경 변수 VITE_TOUR_WORKER_URL이 설정되어 있으면 그 값을 사용하고, 없을 경우 기본 프록시 URL을 사용합니다.
+const WORKER_URL = ((import.meta as any)?.env?.VITE_TOUR_WORKER_URL as string) || 'https://tour-api-proxy.lsd9901.workers.dev';
 
-if (!API_KEY) {
-  // This will be shown in the browser's console in development
-  if (import.meta.env.DEV) {
-    console.error('API key is not set. Please set VITE_TOUR_API_KEY in your .env file');
-  }
-}
-
-// API 서비스 객체 - 언어별 endpoint와 서비스키를 관리
+// 언어별 서비스명 매핑 (공공 API의 서비스 식별자)
 const API_SERVICES = {
-  ko: {
-    name: 'KorService2',
-    endpoint: `${BASE_URL}/KorService2`,
-    serviceKey: API_KEY
-  },
-  en: {
-    name: 'EngService2',
-    endpoint: `${BASE_URL}/EngService2`,
-    serviceKey: API_KEY
-  },
-  ja: {
-    name: 'JpnService2',
-    endpoint: `${BASE_URL}/JpnService2`,
-    serviceKey: API_KEY
-  },
-  zh: {
-    name: 'ChsService2',
-    endpoint: `${BASE_URL}/ChsService2`,
-    serviceKey: API_KEY
-  },
-  de: {
-    name: 'GerService2',
-    endpoint: `${BASE_URL}/GerService2`,
-    serviceKey: API_KEY
-  },
-  fr: {
-    name: 'FreService2',
-    endpoint: `${BASE_URL}/FreService2`,
-    serviceKey: API_KEY
-  }
+  ko: 'KorService2',
+  en: 'EngService2',
+  ja: 'JpnService2',
+  zh: 'ChsService2',
+  de: 'GerService2',
+  fr: 'FreService2'
 } as const;
 
 export type Language = keyof typeof API_SERVICES;
 
+/**
+ * TourApiParams
+ * - 공공 API에 넘기는 쿼리 파라미터들을 타입으로 정의합니다.
+ * - 필요한 경우 추가 필드를 여기에 선언하세요.
+ */
 export interface TourApiParams {
   serviceKey?: string;
   numOfRows?: number;
   pageNo?: number;
-  MobileOS?: 'ETC' | 'IOS' | 'AND' | 'WIN';
+  // MobileOS 값: IOS(아이폰), AND(안드로이드), WEB(웹), ETC(기타)
+  MobileOS?: 'ETC' | 'IOS' | 'AND' | 'WEB';
   MobileApp?: string;
   _type?: 'json' | 'xml';
   listYN?: 'Y' | 'N';
@@ -76,115 +54,181 @@ export interface TourApiParams {
   overviewYN?: 'Y' | 'N';
   imageYN?: 'Y' | 'N';
   subImageYN?: 'Y' | 'N';
-serviceKey?: string;
-numOfRows?: number;
-pageNo?: number;
-MobileOS?: 'ETC' | 'IOS' | 'AND' | 'WIN';
-MobileApp?: string;
-_type?: 'json' | 'xml';
-listYN?: 'Y' | 'N';
-arrange?: 'A' | 'B' | 'C' | 'D' | 'E';
-contentTypeId?: string;
-areaCode?: string;
-sigunguCode?: string;
-cat1?: string;
-cat2?: string;
-cat3?: string;
-keyword?: string;
-contentId?: string;
-mapX?: string;
-mapY?: string;
-radius?: number;
-defaultYN?: 'Y' | 'N';
-firstImageYN?: 'Y' | 'N';
-areacodeYN?: 'Y' | 'N';
-catcodeYN?: 'Y' | 'N';
-addrinfoYN?: 'Y' | 'N';
-mapinfoYN?: 'Y' | 'N';
-overviewYN?: 'Y' | 'N';
-imageYN?: 'Y' | 'N';
-subImageYN?: 'Y' | 'N';
+  // 축제/행사 파라미터 (YYYYMMDD 형식)
+  eventStartDate?: string;
+  eventEndDate?: string;
 }
 
+/**
+ * TourApiResponse
+ * - 공공 API의 공통 응답 래퍼 구조를 표현합니다.
+ * - 실제 item 타입은 제네릭으로 전달합니다.
+ */
 export interface TourApiResponse<T = any> {
-response: {
-header: {
-resultCode: string;
-resultMsg: string;
-};
-body: {
-items?: {
-item: T[];
-};
-numOfRows: number;
-pageNo: number;
-totalCount: number;
-};
-};
+  response: {
+    header: {
+      resultCode: string;
+      resultMsg: string;
+    };
+    body: {
+      items?: {
+        item: T[];
+      };
+      numOfRows: number;
+      pageNo: number;
+      totalCount: number;
+    };
+  };
 }
 
-// API 호출 공통 함수
-async function callTourApi<T = any>(
-language: Language,
-endpoint: string,
-params: TourApiParams = {}
+// 인메모리 캐시 (개발 환경 HMR 시 유지되도록 globalThis에 저장)
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5분
+if (!(globalThis as any).__tourApiCache) {
+  (globalThis as any).__tourApiCache = new Map<string, { expiry: number; data: any }>();
+}
+const cache: Map<string, { expiry: number; data: any }> = (globalThis as any).__tourApiCache;
+
+/**
+ * fetchWithRetry
+ * - 지정한 타임아웃과 재시도 수를 사용해 fetch를 수행합니다.
+ * - 4xx 응답은 재시도하지 않으며, 타임아웃 발생 시 AbortController로 요청을 취소합니다.
+ * @param url 요청 URL
+ * @param options fetch 옵션
+ * @param timeoutMs 타임아웃(ms)
+ * @param retries 재시도 횟수
+ */
+async function fetchWithRetry(url: string, options: RequestInit = {}, timeoutMs = 10000, retries = 1): Promise<Response> {
+  const attempt = async (n: number): Promise<Response> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!resp.ok) {
+        // 4xx 에러의 경우 재시도하지 않음
+        if (resp.status >= 400 && resp.status < 500) {
+          return resp;
+        }
+        throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+      }
+      return resp;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        // 타임아웃으로 처리
+        if (n <= 0) throw new Error('Request timed out');
+      }
+      if (n <= 0) throw err;
+      // 지수 백오프
+      const backoff = 200 * Math.pow(2, retries - n);
+      await new Promise((res) => setTimeout(res, backoff));
+      return attempt(n - 1);
+    }
+  };
+
+  return attempt(retries + 1);
+}
+
+/**
+ * callTourApi
+ * - 언어별 서비스 엔드포인트에 요청을 보내고, 공통 응답 타입으로 반환합니다.
+ * - 내부적으로 캐시 확인, fetchWithRetry 호출, 에러 표준화 처리를 수행합니다.
+ * @param language 사용할 언어(서비스)
+ * @param endpoint 서비스 엔드포인트 (예: '/areaBasedList2')
+ * @param params API 파라미터
+ */
+export async function callTourApi<T>(
+  language: Language,
+  endpoint: string,
+  params: TourApiParams = {}
 ): Promise<TourApiResponse<T>> {
-const service = API_SERVICES[language];
+  const serviceName = API_SERVICES[language];
+  if (!serviceName) {
+    throw new Error(`Unsupported language: ${language}`);
+  }
 
-// Set default parameters
-const defaultParams: TourApiParams = {
-serviceKey: service.serviceKey,
-numOfRows: 12,
-pageNo: 1,
-MobileOS: 'ETC',
-MobileApp: 'TourismApp',
-_type: 'json'
-};
+  // 기본 파라미터 설정 (웹에서는 MobileOS를 WEB으로 고정)
+  const defaultParams: TourApiParams = {
+    MobileOS: 'WEB',
+    MobileApp: 'SoraMiro',
+    _type: 'json',
+    ...params,
+  };
 
-// Only include listYN if explicitly provided in params
-const requestParams = {
-...defaultParams,
-...params
-};
-
-// Convert to URLSearchParams, filtering out undefined values
-const queryParams = new URLSearchParams();
-Object.entries(requestParams).forEach(([key, value]) => {
-    if (value !== undefined) {
-      queryParams.append(key, String(value));
+  // URLSearchParams를 사용하여 쿼리 파라미터 생성
+  const queryParams = new URLSearchParams();
+  Object.entries(defaultParams).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      // 배열인 경우 각 요소를 반복하여 추가
+      if (Array.isArray(value)) {
+        value.forEach(v => queryParams.append(key, v.toString()));
+      } else {
+        queryParams.append(key, value.toString());
+      }
     }
   });
 
-  const url = `${service.endpoint}${endpoint}?${queryParams}`;
-  
-  // Request URL
+  // 엔드포인트 앞에 슬래시가 있으면 제거
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+  const url = new URL(`${serviceName}/${cleanEndpoint}`, WORKER_URL);
+
+  // 쿼리 파라미터 추가
+  queryParams.forEach((value, key) => {
+    url.searchParams.append(key, value);
+  });
+
+  // 캐시 확인
+  const cacheKey = url.toString();
+  const now = Date.now();
+  const cached = cache.get(cacheKey);
+  if (cached && cached.expiry > now) {
+    return cached.data as TourApiResponse<T>;
+  }
+  // --- fetch 호출 (재시도 포함) ---
+  const DEFAULT_TIMEOUT_MS = 10000; // 10초
+  const fetchOptions: RequestInit = {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json'
+    }
+  };
 
   try {
-    const response = await fetch(url);
-    const responseText = await response.text();
-
+    const response = await fetchWithRetry(url.toString(), fetchOptions, DEFAULT_TIMEOUT_MS, 2);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}, response: ${responseText}`);
+      // JSON 에러 본문이 있는 경우 파싱 시도
+      let bodyText: string | undefined;
+      try {
+        bodyText = await response.text();
+      } catch {}
+      const err = new Error(`API request failed with status ${response.status}: ${bodyText || response.statusText}`);
+      (err as any).status = response.status;
+      (err as any).url = url.toString();
+      throw err;
     }
 
-    let data;
+    const json = await response.json();
+
+    // 성공 응답 캐싱
     try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      // Failed to parse API response
-      throw new Error(`Failed to parse API response: ${parseError.message}`);
+      cache.set(cacheKey, { expiry: Date.now() + CACHE_TTL_MS, data: json });
+    } catch (e) {
+      console.warn('Failed to cache API response', e);
     }
 
-
-    return data;
+    return json;
   } catch (error: any) {
-    // Handle error
-
-    // Enhance the error with more context
-    const enhancedError = new Error(`API call failed: ${error.message}`);
-    (enhancedError as any).originalError = error;
-    (enhancedError as any).url = url;
-    throw enhancedError;
+    // 컨텍스트와 함께 오류 객체 표준화
+    if (error.name === 'AbortError' || /timed out/i.test(error.message || '')) {
+      const e = new Error('API 요청이 타임아웃되었습니다. 네트워크 상태를 확인하세요.');
+      (e as any).original = error;
+      (e as any).url = url.toString();
+      throw e;
+    }
+    const e = new Error(error.message || 'API 호출 실패');
+    (e as any).original = error;
+    (e as any).url = url.toString();
+    throw e;
   }
 }
 
