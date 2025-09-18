@@ -1,11 +1,28 @@
 // tourApi 모듈
 // - 공공 관광 API(한국관광공사) 호출을 위한 헬퍼들을 제공합니다.
 // - 클라이언트는 로컬/프록시(worker) URL을 통해 요청을 보냅니다. 민감한 키는 서버/워커에서 관리해야 합니다.
-const BASE_URL = 'https://apis.data.go.kr/B551011';
 
-// 클라이언트에서 호출하는 프록시(예: Cloudflare Worker) 기본 URL
-// 환경 변수 VITE_TOUR_WORKER_URL이 설정되어 있으면 그 값을 사용하고, 없을 경우 기본 프록시 URL을 사용합니다.
-const WORKER_URL = ((import.meta as any)?.env?.VITE_TOUR_WORKER_URL as string) || 'https://tour-api-proxy.lsd9901.workers.dev';
+// 개발 환경에서는 로컬 서버를, 프로덕션에서는 원격 서버를 사용
+const isLocalDev = import.meta.env.DEV;
+
+// API 기본 URL (로컬 개발 시에는 프록시를 통해 요청)
+const BASE_URL = isLocalDev 
+  ? 'http://localhost:8787'  // 로컬 개발 서버 (프록시)
+  : 'https://apis.data.go.kr/B551011';  // 프로덕션 서버
+
+// 클라이언트에서 호출하는 프록시 기본 URL
+// 개발 환경에서는 로컬 서버를, 프로덕션에서는 환경 변수 또는 기본 URL 사용
+const WORKER_URL = isLocalDev
+  ? 'http://localhost:8787'
+  : ((import.meta as any)?.env?.VITE_TOUR_WORKER_URL as string) || 'https://tour-api-proxy.lsd9901.workers.dev';
+
+// API 요청에 사용할 기본 파라미터
+const DEFAULT_PARAMS = {
+  MobileOS: 'WEB',
+  MobileApp: 'SoraMiro',
+  _type: 'json',
+  serviceKey: isLocalDev ? '' : undefined, // 로컬 개발 시에는 프록시가 처리
+};
 
 // 언어별 서비스명 매핑 (공공 API의 서비스 식별자)
 const API_SERVICES = {
