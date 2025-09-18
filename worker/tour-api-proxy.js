@@ -1,6 +1,13 @@
 // 캐시 TTL 설정 (초 단위)
 const CACHE_TTL = 60 * 10; // 5분 캐시
 
+// 민감한 정보를 제거하는 함수
+function sanitizeErrorMessage(message) {
+  if (!message) return 'An error occurred';
+  // API 키가 포함된 URL 패턴 제거
+  return message.replace(/serviceKey=[^&\s]+/g, 'serviceKey=[REDACTED]');
+}
+
 // CORS 헤더 설정
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,10 +17,11 @@ const corsHeaders = {
 };
 
 addEventListener('fetch', event => {
-  event.respondWith(handleRequest(event.request));
+  event.respondWith(handleRequest(event));
 });
 
-async function handleRequest(request) {
+async function handleRequest(event) {
+  const request = event.request;
   const origin = request.headers.get('Origin') || '*';
   
   // CORS 프리플라이트 요청 처리
@@ -57,56 +65,64 @@ async function handleRequest(request) {
   // 캐시에서 응답 확인
   let response = await cache.match(cacheKey);
   if (response) {
-    console.log('Cache hit!');
     return response;
   }
-  
-  console.log('Cache miss, fetching from API...');
   
   try {
     const encodedKey = encodeURIComponent(API_KEY);
     // 실제 API로 요청 전달
-    const apiUrl = `https://apis.data.go.kr/B551011${path}?serviceKey=${encodedKey}&${url.searchParams.toString()}`;
+    const apiUrl = `https://apis.data.go.kr/B551011${path}?serviceKey=${API_KEY}${url.search ? '&' + url.searchParams.toString().replace(/^\?/, '') : ''}`;
     
-    const apiResponse = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    try {
+      const apiResponse = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
 
-    // 응답 본문 가져오기
-    const responseText = await apiResponse.text();
+      // 응답 본문 가져오기
+      const responseText = await apiResponse.text();
+      
+      // 응답이 JSON 형식인지 확인
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error('Invalid API response format');
+      }
 
-    if (!apiResponse.ok) {
-      throw new Error(`API request failed (${apiResponse.status}): ${responseText}`);
+      if (!apiResponse.ok) {
+        throw new Error(`API request failed with status ${apiResponse.status}`);
+      }
+      
+      // 응답 생성 및 캐싱 설정
+      const response = new Response(JSON.stringify(data), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Access-Control-Allow-Origin': origin,
+          'Content-Type': 'application/json',
+          'Cache-Control': `public, max-age=${CACHE_TTL}`,
+        },
+      });
+      
+      // 응답을 캐시에 저장 (비동기로 처리)
+      event.waitUntil(cache.put(cacheKey, response.clone()));
+      
+      return response;
+    } catch (apiError) {
+      throw apiError;
     }
-
-    // JSON 파싱
-    const data = JSON.parse(responseText);
-    
-    // 응답 생성 및 캐싱 설정
-    const response = new Response(JSON.stringify(data), {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Access-Control-Allow-Origin': origin,
-        'Content-Type': 'application/json',
-        'Cache-Control': `public, max-age=${CACHE_TTL}`,
-      },
-    });
-    
-    // 응답을 캐시에 저장 (비동기로 처리)
-    event.waitUntil(cache.put(cacheKey, response.clone()));
-    event.waitUntil(cache.put(cacheKey, response.clone()));
-    
-    return response;
   } catch (error) {
-    console.error('Error:', error);
-    return new Response(JSON.stringify({ 
-      error: error.message,
-      stack: error.stack,
-    }), {
+    const sanitizedError = {
+      error: 'An error occurred while processing your request',
+      details: process.env.NODE_ENV === 'development' 
+        ? sanitizeErrorMessage(error.message)
+        : undefined,
+    };
+    
+    return new Response(JSON.stringify(sanitizedError), {
       status: 500,
       headers: {
         ...corsHeaders,

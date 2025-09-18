@@ -1,11 +1,11 @@
 name = "tour-api-proxy"
 main = "tour-api-proxy.js"
-compatibility_date = "2023-05-18"
+compatibility_date = "2025-09-08"
 
 # Environment variables
 [vars]
 # This will be set in the Cloudflare dashboard
-# TOUR_API_KEY = "GeCR9jYw62rA3I71yk2v+pKw9Hy77LH+7NzfRTRuASAc40tHNYFff9JTMyjM9ePxqdK6LBa2hs476TmIYhIscQ=="
+# TOUR_API_KEY = "YourApiKey"
 
 # Route configuration (update with your domain)
 # Uncomment and update these lines after deployment

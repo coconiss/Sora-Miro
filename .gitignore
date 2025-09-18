@@ -25,3 +25,6 @@ yarn-error.log*
 
 # Local development
 .DS_Store
+
+# Worker directory
+/worker/
