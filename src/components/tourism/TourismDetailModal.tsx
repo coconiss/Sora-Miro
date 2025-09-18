@@ -1,4 +1,6 @@
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { getDetailPetTour } from '@/services/tourApi';
+import { useLanguage } from '@/contexts/LanguageContext';
 import {
   Dialog,
   DialogContent,
@@ -59,12 +61,22 @@ interface TourismDetailModalProps {
   open: boolean;
   onClose: () => void;
   loading?: boolean;
+  petInfo?: {
+    acmpyPsblCpam?: string;      // 동반가능동물
+    relaRentlPrdlst?: string;    // 관련렌탈품목
+    acmpyNeedMtr?: string;       // 동반시필요사항
+    relaFrnshPrdlst?: string;    // 관련 비치 품목
+    etcAcmpyInfo?: string;       // 기타 동반 정보
+    relaPurcPrdlst?: string;     // 관련 구매 품목
+    relaAcdntRiskMtr?: string;   // 관련 사고 대비사항
+    acmpyTypeCd?: string;        // 동반유형
+    relaPosesFclty?: string;     // 관련 구비 시설
+  } | null;
 }
-
 
 const getCategoryName = (catCode?: string): string => {
   if (!catCode) return '기타';
-  
+
   const categories: { [key: string]: string } = {
     'A01': '자연', 'A02': '인문', 'A03': '레포츠', 'A04': '쇼핑', 'A05': '음식',
     'B01': '숙박', 'B02': '캠핑', 'B03': '휴양', 'B04': '이색숙박',
@@ -78,7 +90,7 @@ const getCategoryName = (catCode?: string): string => {
 
 const getContentTypeName = (contentTypeId?: string): string => {
   if (!contentTypeId) return '';
-  
+
   const contentTypes: { [key: string]: string } = {
     '12': '관광지', '14': '문화시설', '15': '행사/공연/축제',
     '25': '여행코스', '28': '레포츠', '32': '숙박',
@@ -88,6 +100,46 @@ const getContentTypeName = (contentTypeId?: string): string => {
 };
 
 export const TourismDetailModal = ({ item, open, onClose, loading = false }: TourismDetailModalProps) => {
+  const { language } = useLanguage();
+  const [petInfo, setPetInfo] = useState<{
+    acmpyPsblCpam?: string;      // 동반가능동물
+    relaRentlPrdlst?: string;    // 관련렌탈품목
+    acmpyNeedMtr?: string;       // 동반시필요사항
+    relaFrnshPrdlst?: string;    // 관련 비치 품목
+    etcAcmpyInfo?: string;       // 기타 동반 정보
+    relaPurcPrdlst?: string;     // 관련 구매 품목
+    relaAcdntRiskMtr?: string;   // 관련 사고 대비사항
+    acmpyTypeCd?: string;        // 동반유형
+    relaPosesFclty?: string;     // 관련 구비 시설
+  } | null>(null);
+  const [loadingPetInfo, setLoadingPetInfo] = useState(false);
+
+  useEffect(() => {
+    const fetchPetInfo = async () => {
+      if (!open || !item?.contentid) {
+        setPetInfo(null);
+        return;
+      }
+
+      try {
+        setLoadingPetInfo(true);
+        const response = await getDetailPetTour(language as any, item.contentid);
+        if (response?.response?.body?.items?.item?.[0]) {
+          setPetInfo(response.response.body.items.item[0]);
+        } else {
+          setPetInfo(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch pet info:', error);
+        setPetInfo(null);
+      } finally {
+        setLoadingPetInfo(false);
+      }
+    };
+
+    fetchPetInfo();
+  }, [open, item?.contentid, language]);
+
   if (!item && !loading) return null;
 
   const formatAddress = (item: TourismItem): string => {
@@ -107,17 +159,17 @@ export const TourismDetailModal = ({ item, open, onClose, loading = false }: Tou
   // Format festival date range (YYYYMMDD → YYYY.MM.DD)
   const formatDateRange = (start: string, end: string): string => {
     if (!start || !end) return '';
-    
+
     const formatDate = (dateStr: string) => {
       const year = dateStr.substring(0, 4);
       const month = dateStr.substring(4, 6);
       const day = dateStr.substring(6, 8);
       return `${year}년 ${month}월 ${day}일`;
     };
-    
+
     return `${formatDate(start)} ~ ${formatDate(end)}`;
   };
-  
+
   const festivalDateRange = (item && (item as any).eventstartdate && (item as any).eventenddate)
     ? formatDateRange((item as any).eventstartdate, (item as any).eventenddate)
     : '';
@@ -125,7 +177,7 @@ export const TourismDetailModal = ({ item, open, onClose, loading = false }: Tou
   const address = formatAddress(item);
   const category = item.cat1 ? getCategoryName(item.cat1) : (item.category || '기타');
   const contentType = getContentTypeName(item.contenttypeid);
-  
+
   const mapUrl = address && address !== '주소 정보 없음'
     ? `https://map.naver.com/p/search/${encodeURIComponent(address)}`
     : '#';
@@ -153,13 +205,13 @@ export const TourismDetailModal = ({ item, open, onClose, loading = false }: Tou
       if (titleMatch && titleMatch[1]) {
         return titleMatch[1];
       }
-      
+
       // 2. title이 없으면 >와 < 사이의 링크 텍스트 추출 시도
       const textMatch = html.match(/>([^<]*)</);
       if (textMatch && textMatch[1]) {
         return textMatch[1].trim();
       }
-      
+
       // 3. 텍스트가 없으면 URL을 대체값으로 사용
       const urlMatch = html.match(/href="([^"]*)"/);
       return urlMatch ? urlMatch[1].replace(/^https?:\/\//, '') : html;
@@ -182,9 +234,9 @@ export const TourismDetailModal = ({ item, open, onClose, loading = false }: Tou
         <div className="flex-1 min-w-0">
           <div className="font-medium text-foreground">{label}</div>
           {isExternalLink ? (
-            <a 
-              href={href} 
-              target="_blank" 
+            <a
+              href={href}
+              target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:text-primary-hover flex items-center gap-1 mt-1 break-all"
             >
@@ -255,29 +307,29 @@ export const TourismDetailModal = ({ item, open, onClose, loading = false }: Tou
                 </div>
               ) : (
                 <>
-                  <InfoItem 
-                    icon={MapPin} 
-                    label="주소" 
+                  <InfoItem
+                    icon={MapPin}
+                    label="주소"
                     value={address}
                     link={mapUrl !== '#' ? mapUrl : undefined}
                   />
-                  
+
                   {item.tel && (
                     <InfoItem icon={Phone} label="전화번호" value={item.tel} />
                   )}
-                  
+
                   {item.infocenter && item.infocenter !== item.tel && (
                     <InfoItem icon={Phone} label="문의처" value={item.infocenter} />
                   )}
-                  
+
                   {item.bookingplace && (
                     <InfoItem icon={Phone} label="예약처" value={item.bookingplace} />
                   )}
-                  
+
                   {homepage && (
-                    <InfoItem 
-                      icon={Globe} 
-                      label="홈페이지" 
+                    <InfoItem
+                      icon={Globe}
+                      label="홈페이지"
                       value={homepage}
                     />
                   )}
@@ -320,19 +372,19 @@ export const TourismDetailModal = ({ item, open, onClose, loading = false }: Tou
                   {item.usetime && (
                     <InfoItem icon={Clock} label="이용시간" value={item.usetime} />
                   )}
-                  
+
                   {item.restdate && (
                     <InfoItem icon={Calendar} label="휴무일" value={item.restdate} />
                   )}
-                  
+
                   {item.parking && (
                     <InfoItem icon={Car} label="주차 정보" value={item.parking} />
                   )}
-                  
+
                   {item.useseason && (
                     <InfoItem icon={Calendar} label="이용 시기" value={item.useseason} />
                   )}
-                  
+
                   {item.accomcount && (
                     <InfoItem icon={Users} label="수용 인원" value={item.accomcount} />
                   )}
@@ -348,7 +400,7 @@ export const TourismDetailModal = ({ item, open, onClose, loading = false }: Tou
                   {item.subfacility && (
                     <InfoItem icon={Star} label="부대시설" value={item.subfacility} />
                   )}
-                  
+
                   {(item.chkcreditcard === 'Y' || item.chkpet === 'Y' || item.chkbabycarriage === 'Y') && (
                     <div className="p-3 bg-muted/30 rounded-lg">
                       <div className="font-medium mb-2">이용 가능 서비스</div>
@@ -374,6 +426,80 @@ export const TourismDetailModal = ({ item, open, onClose, loading = false }: Tou
                       </div>
                     </div>
                   )}
+                </InfoSection>
+              </>
+            )}
+
+            {/* 반려동물 동반 정보 */}
+            {petInfo && (
+              <>
+                <Separator />
+                <InfoSection icon={PawPrint} title="반려동물 동반 정보">
+                  <div className="space-y-3">
+                    {petInfo.acmpyPsblCpam && (
+                      <InfoItem
+                        icon={PawPrint}
+                        label="동반 가능한 동물"
+                        value={petInfo.acmpyPsblCpam}
+                      />
+                    )}
+                    {petInfo.acmpyTypeCd && (
+                      <InfoItem
+                        icon={PawPrint}
+                        label="동반 유형"
+                        value={petInfo.acmpyTypeCd}
+                      />
+                    )}
+                    {petInfo.acmpyNeedMtr && (
+                      <InfoItem
+                        icon={PawPrint}
+                        label="동반 시 필요사항"
+                        value={petInfo.acmpyNeedMtr}
+                      />
+                    )}
+                    {petInfo.relaRentlPrdlst && (
+                      <InfoItem
+                        icon={PawPrint}
+                        label="관련 렌탈 품목"
+                        value={petInfo.relaRentlPrdlst}
+                      />
+                    )}
+                    {petInfo.relaFrnshPrdlst && (
+                      <InfoItem
+                        icon={PawPrint}
+                        label="관련 비치 품목"
+                        value={petInfo.relaFrnshPrdlst}
+                      />
+                    )}
+                    {petInfo.relaPurcPrdlst && (
+                      <InfoItem
+                        icon={PawPrint}
+                        label="관련 구매 품목"
+                        value={petInfo.relaPurcPrdlst}
+                      />
+                    )}
+                    {petInfo.relaPosesFclty && (
+                      <InfoItem
+                        icon={PawPrint}
+                        label="관련 구비 시설"
+                        value={petInfo.relaPosesFclty}
+                      />
+                    )}
+                    {petInfo.relaAcdntRiskMtr && (
+                      <InfoItem
+                        icon={PawPrint}
+                        label="사고 대비사항"
+                        value={petInfo.relaAcdntRiskMtr}
+                      />
+                    )}
+                    {petInfo.etcAcmpyInfo && (
+                      <InfoItem
+                        icon={PawPrint}
+                        label="기타 동반 정보"
+                        value={petInfo.etcAcmpyInfo}
+                      />
+                    )}
+                  </div>
                 </InfoSection>
               </>
             )}

@@ -9,76 +9,76 @@ const WORKER_URL = ((import.meta as any)?.env?.VITE_TOUR_WORKER_URL as string) |
 
 // 언어별 서비스명 매핑 (공공 API의 서비스 식별자)
 const API_SERVICES = {
-  ko: 'KorService2',
-  en: 'EngService2',
-  ja: 'JpnService2',
-  zh: 'ChsService2',
-  de: 'GerService2',
-  fr: 'FreService2'
+ko: 'KorService2',
+en: 'EngService2',
+ja: 'JpnService2',
+zh: 'ChsService2',
+de: 'GerService2',
+fr: 'FreService2'
 } as const;
 
 export type Language = keyof typeof API_SERVICES;
 
 /**
- * TourApiParams
- * - 공공 API에 넘기는 쿼리 파라미터들을 타입으로 정의합니다.
- * - 필요한 경우 추가 필드를 여기에 선언하세요.
- */
+* TourApiParams
+* - 공공 API에 넘기는 쿼리 파라미터들을 타입으로 정의합니다.
+* - 필요한 경우 추가 필드를 여기에 선언하세요.
+*/
 export interface TourApiParams {
-  serviceKey?: string;
-  numOfRows?: number;
-  pageNo?: number;
-  // MobileOS 값: IOS(아이폰), AND(안드로이드), WEB(웹), ETC(기타)
-  MobileOS?: 'ETC' | 'IOS' | 'AND' | 'WEB';
-  MobileApp?: string;
-  _type?: 'json' | 'xml';
-  listYN?: 'Y' | 'N';
-  arrange?: 'A' | 'B' | 'C' | 'D' | 'E';
-  contentTypeId?: string;
-  areaCode?: string;
-  sigunguCode?: string;
-  cat1?: string;
-  cat2?: string;
-  cat3?: string;
-  keyword?: string;
-  contentId?: string;
-  mapX?: string;
-  mapY?: string;
-  radius?: number;
-  defaultYN?: 'Y' | 'N';
-  firstImageYN?: 'Y' | 'N';
-  areacodeYN?: 'Y' | 'N';
-  catcodeYN?: 'Y' | 'N';
-  addrinfoYN?: 'Y' | 'N';
-  mapinfoYN?: 'Y' | 'N';
-  overviewYN?: 'Y' | 'N';
-  imageYN?: 'Y' | 'N';
-  subImageYN?: 'Y' | 'N';
-  // 축제/행사 파라미터 (YYYYMMDD 형식)
-  eventStartDate?: string;
-  eventEndDate?: string;
+serviceKey?: string;
+numOfRows?: number;
+pageNo?: number;
+// MobileOS 값: IOS(아이폰), AND(안드로이드), WEB(웹), ETC(기타)
+MobileOS?: 'ETC' | 'IOS' | 'AND' | 'WEB';
+MobileApp?: string;
+_type?: 'json' | 'xml';
+listYN?: 'Y' | 'N';
+arrange?: 'A' | 'B' | 'C' | 'D' | 'E';
+contentTypeId?: string;
+areaCode?: string;
+sigunguCode?: string;
+cat1?: string;
+cat2?: string;
+cat3?: string;
+keyword?: string;
+contentId?: string;
+mapX?: string;
+mapY?: string;
+radius?: number;
+defaultYN?: 'Y' | 'N';
+firstImageYN?: 'Y' | 'N';
+areacodeYN?: 'Y' | 'N';
+catcodeYN?: 'Y' | 'N';
+addrinfoYN?: 'Y' | 'N';
+mapinfoYN?: 'Y' | 'N';
+overviewYN?: 'Y' | 'N';
+imageYN?: 'Y' | 'N';
+subImageYN?: 'Y' | 'N';
+// 축제/행사 파라미터 (YYYYMMDD 형식)
+eventStartDate?: string;
+eventEndDate?: string;
 }
 
 /**
- * TourApiResponse
- * - 공공 API의 공통 응답 래퍼 구조를 표현합니다.
- * - 실제 item 타입은 제네릭으로 전달합니다.
- */
+* TourApiResponse
+* - 공공 API의 공통 응답 래퍼 구조를 표현합니다.
+* - 실제 item 타입은 제네릭으로 전달합니다.
+*/
 export interface TourApiResponse<T = any> {
-  response: {
-    header: {
-      resultCode: string;
-      resultMsg: string;
-    };
-    body: {
-      items?: {
-        item: T[];
-      };
-      numOfRows: number;
-      pageNo: number;
-      totalCount: number;
-    };
-  };
+response: {
+header: {
+resultCode: string;
+resultMsg: string;
+};
+body: {
+items?: {
+item: T[];
+};
+numOfRows: number;
+pageNo: number;
+totalCount: number;
+};
+};
 }
 
 // 인메모리 캐시 (개발 환경 HMR 시 유지되도록 globalThis에 저장)
@@ -355,6 +355,23 @@ export async function getLocationBasedList(
     mapX,
     mapY,
     radius
+  });
+}
+
+/**
+ * 반려동물 관광정보 조회
+ * @param language 언어 코드
+ * @param contentId 콘텐츠 ID
+ * @param params 추가 파라미터 (선택사항)
+ */
+export async function getDetailPetTour(
+  language: Language,
+  contentId: string,
+  params: TourApiParams = {}
+): Promise<TourApiResponse> {
+  return callTourApi(language, '/detailPetTour2', {
+    ...params,
+    contentId
   });
 }
 
